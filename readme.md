@@ -11,6 +11,8 @@ A clean, Supabase-backed packing checklist for hostel move-in. Track what to buy
 - 🔍 Search + filter by status or source
 - 📱 Mobile responsive
 
+---
+
 ## Setup
 
 ### 1. Create a Supabase project
@@ -21,6 +23,7 @@ Go to [supabase.com](https://supabase.com) and create a free account + new proje
 
 In your Supabase project, open the **SQL Editor** and run:
 
+```sql
 create table if not exists categories (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
@@ -44,28 +47,49 @@ create table if not exists items (
   created_at timestamptz default now()
 );
 
--- Allow public read/write (you can add auth later)
+-- Enable Row Level Security and allow public access
 alter table categories enable row level security;
 alter table items enable row level security;
 
 create policy "Public access" on categories for all using (true) with check (true);
 create policy "Public access" on items for all using (true) with check (true);
+```
 
-### 3. Add your credentials
+> ⚠️ The RLS policies are required. Without them Supabase blocks all reads/writes and the app will hang on the setup screen.
 
-Open `config.js` and replace the placeholders with your project's values.  
-You'll find them in your Supabase project under **Settings → API**:
+### 3. Deploy to Netlify
+
+This project uses a build script to inject your Supabase credentials at deploy time — your keys never touch the git repo.
+
+**a) Push the repo to GitHub** (`config.js` is gitignored — don't create it manually)
+
+**b) Connect to Netlify**
+- New site → Import from Git → pick your repo
+- Netlify auto-detects `netlify.toml`, so build settings are prefilled
+
+**c) Add environment variables**
+In Netlify: **Site configuration → Environment variables → Add a variable**
+
+| Key | Value |
+|-----|-------|
+| `SUPABASE_URL` | `https://your-project.supabase.co` |
+| `ANON_KEY` | `your-anon-public-key` |
+
+Just the values — no quotes, no `const`, no semicolons.
+
+**d) Trigger a deploy**
+Go to **Deploys → Trigger deploy → Deploy site**. Netlify runs `build.sh`, which generates `config.js` from your env vars on the server.
+
+### 4. Running locally
+
+Create a `config.js` file in the project root (it's gitignored):
 
 ```js
 const SUPABASE_URL = 'https://your-project.supabase.co';
 const ANON_KEY     = 'your-anon-public-key';
 ```
 
-### 4. Open the app
-
-Open `index.html` in your browser (or host the folder anywhere — it's all static).
-
-On first load, the app will auto-seed the default checklist into your Supabase project.
+Then open `index.html` in your browser. On first load the app will auto-seed the default checklist into your Supabase project.
 
 ---
 
@@ -73,14 +97,17 @@ On first load, the app will auto-seed the default checklist into your Supabase p
 
 ```
 hostel-checklist/
-├── index.html   — markup and layout
-├── style.css    — all styles
-├── app.js       — all logic
-├── config.js    — ← your credentials go here (don't commit this!)
+├── index.html      — markup and layout
+├── style.css       — all styles
+├── app.js          — all logic
+├── config.js       — your credentials (gitignored, never committed)
+├── build.sh        — generates config.js from env vars at Netlify build time
+├── netlify.toml    — tells Netlify to run build.sh
+├── .gitignore
 └── README.md
 ```
 
-> **Tip:** Add `config.js` to your `.gitignore` if you fork this repo so your credentials are never accidentally committed.
+---
 
 ## Customising
 
