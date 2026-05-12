@@ -57,7 +57,7 @@ create policy "Public access" on items for all using (true) with check (true);
 
 > ⚠️ The RLS policies are required. Without them Supabase blocks all reads/writes and the app will hang on the setup screen.
 
-### 3. Deploy to Netlify
+### 3. Deploy to Netlify (If needed to host)
 
 This project uses a build script to inject your Supabase credentials at deploy time — your keys never touch the git repo.
 
