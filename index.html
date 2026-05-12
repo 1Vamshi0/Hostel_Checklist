@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hostel Checklist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <h2>Setting up your checklist</h2>
+  <p>Creating tables and loading your data into Supabase. This only happens once.</p>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+    <div class="setup-step" id="step-connect"><div class="dot"></div> Connecting to Supabase</div>
+    <div class="setup-step" id="step-tables"><div class="dot"></div> Creating tables</div>
+    <div class="setup-step" id="step-seed"><div class="dot"></div> Seeding your data</div>
+    <div class="setup-step" id="step-load"><div class="dot"></div> Loading app</div>
+  </div>
+  <div id="setup-error"></div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <!-- TOP NAV -->
+  <nav class="top-nav">
+    <div class="nav-brand">Hostel Checklist</div>
+    <div class="nav-sub">GLIM 2025 · Batch 1</div>
+    <div class="nav-divider"></div>
+    <div class="nav-progress">
+      <div class="nav-progress-bar"><div class="nav-progress-fill" id="progress-fill" style="width:0%"></div></div>
+      <span class="nav-progress-text" id="progress-text">0 of 0 packed</span>
+      <span class="nav-progress-text" id="progress-pct" style="color:var(--accent);font-weight:600">0%</span>
+    </div>
+    <div style="flex:1"></div>
+    <div class="search-wrap" style="max-width:260px">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="search-input" placeholder="Search items..." oninput="renderAll()">
+    </div>
+    <button class="add-cat-btn" onclick="openAddCategoryModal()">+ Category</button>
+  </nav>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <span class="filter-group-label">Status</span>
+    <button class="filter-pill active" data-filter="all" onclick="setFilter('status','all',this)">
+      <span class="filter-dot" style="background:var(--text3)"></span>All <span class="filter-count" id="fc-all">0</span>
+    </button>
+    <button class="filter-pill" data-filter="pending" onclick="setFilter('status','pending',this)">
+      <span class="filter-dot" style="background:var(--text3)"></span>Pending <span class="filter-count" id="fc-pending">0</span>
+    </button>
+    <button class="filter-pill" data-filter="bought" onclick="setFilter('status','bought',this)">
+      <span class="filter-dot" style="background:var(--blue)"></span>Bought <span class="filter-count" id="fc-bought">0</span>
+    </button>
+    <button class="filter-pill" data-filter="packed" onclick="setFilter('status','packed',this)">
+      <span class="filter-dot" style="background:var(--green)"></span>Packed <span class="filter-count" id="fc-packed">0</span>
+    </button>
+    <button class="filter-pill" data-filter="not_needed" onclick="setFilter('status','not_needed',this)">
+      <span class="filter-dot" style="background:var(--red)"></span>Not needed <span class="filter-count" id="fc-not_needed">0</span>
+    </button>
+    <div class="filter-sep"></div>
+    <span class="filter-group-label">Source</span>
+    <button class="filter-pill active" data-filter="all" onclick="setFilter('source','all',this)" id="sf-all">
+      <span class="filter-dot" style="background:var(--text3)"></span>All sources
+    </button>
+    <button class="filter-pill" data-filter="Buy in HYD" onclick="setFilter('source','Buy in HYD',this)" id="sf-hyd">
+      <span class="filter-dot" style="background:var(--blue)"></span>Buy in HYD
+    </button>
+    <button class="filter-pill" data-filter="Buy at GLIM" onclick="setFilter('source','Buy at GLIM',this)" id="sf-glim">
+      <span class="filter-dot" style="background:var(--purple)"></span>Buy at GLIM
+    </button>
+    <button class="filter-pill" data-filter="Already have" onclick="setFilter('source','Already have',this)" id="sf-have">
+      <span class="filter-dot" style="background:var(--green)"></span>Already have
+    </button>
+  </div>
+
+  <main class="main">
+    <div class="top-bar" style="margin-bottom:24px">
+      <div style="font-family:var(--font-display);font-size:22px;color:var(--text)">Your Packing List</div>
+      <div style="margin-left:auto"></div>
+    </div>
+    <div id="categories-container"></div>
+  </main>
+</div>
+
+<!-- ADD CATEGORY MODAL -->
+<div class="modal-overlay" id="cat-modal">
+  <div class="modal">
+    <h3>New Category</h3>
+    <div class="modal-field"><label>Name</label><input type="text" id="cat-name-input" placeholder="e.g. Sports Gear"></div>
+    <div class="modal-field"><label>Icon (emoji)</label><input type="text" id="cat-icon-input" placeholder="🏏" maxlength="4"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('cat-modal')">Cancel</button>
+      <button class="btn-save" onclick="addCategory()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD ITEM MODAL -->
+<div class="modal-overlay" id="item-modal">
+  <div class="modal">
+    <h3 id="item-modal-title">New Item</h3>
+    <div class="modal-field"><label>Name</label><input type="text" id="item-name-input" placeholder="Item name"></div>
+    <div class="modal-field"><label>Quantity</label><input type="text" id="item-qty-input" placeholder="e.g. 2, 7–10, 1 pair"></div>
+    <div class="modal-field">
+      <label>Source</label>
+      <select id="item-source-input">
+        <option value="">— select —</option>
+        <option value="Buy in HYD">Buy in HYD</option>
+        <option value="Buy at GLIM">Buy at GLIM</option>
+        <option value="Already have">Already have</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('item-modal')">Cancel</button>
+      <button class="btn-save" onclick="addItem()">Add Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- LINKS HOVER POPOVER -->
+<div id="links-hover-popover"></div>
+
+<!-- STATUS MENU -->
+<div id="status-menu" class="status-menu" style="display:none"></div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- Load order matters: config first, then Supabase, then app -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
