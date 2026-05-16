@@ -273,6 +273,7 @@ function renderCategories() {
         <span class="cat-count-badge">${allCatItems.length}</span>
         <span class="cat-progress-mini">${packedCount}/${allCatItems.length}</span>
         <button class="add-item-btn" onclick="event.stopPropagation();openAddItemModal('${cat.id}')">+ Item</button>
+        <button class="download-cat-btn" onclick="event.stopPropagation();downloadCategory('${cat.id}')" title="Download shopping list for ${cat.name}">↓ List</button>
         <span class="cat-chevron ${collapsed ? '' : 'open'}">▾</span>
       </div>`;
 
@@ -655,6 +656,129 @@ function toast(msg) {
 document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
 });
+
+// ─── DOWNLOAD CATEGORY ───────────────────────────────────────────────────────
+function downloadCategory(catId) {
+  const cat = categories.find(c => c.id === catId);
+  if (!cat) return;
+
+  const catItems = items.filter(i => i.category_id === catId && !i.parent_id);
+
+  const statusColors = {
+    pending:    { bg: '#fff8ee', text: '#b36b00', border: '#f5d48a' },
+    bought:     { bg: '#eef4ff', text: '#1a4fa8', border: '#b3cef5' },
+    packed:     { bg: '#edfaf3', text: '#176641', border: '#96ddb8' },
+    not_needed: { bg: '#fef0ee', text: '#a02215', border: '#f5b3aa' },
+  };
+  const statusLabels = { pending: 'Pending', bought: 'Bought ✓', packed: 'Packed ✓✓', not_needed: 'Not needed' };
+  const sourceColors = {
+    'Buy in HYD':  { bg: '#eef4ff', text: '#1a4fa8' },
+    'Buy at GLIM': { bg: '#f3eeff', text: '#3d04b5' },
+    'Already have':{ bg: '#edfaf3', text: '#176641' },
+  };
+
+  function itemCard(item, isSubtask = false) {
+    const sc = statusColors[item.status] || statusColors.pending;
+    const sl = statusLabels[item.status] || 'Pending';
+    const src = item.source ? (sourceColors[item.source] || { bg: '#f0ede8', text: '#6b6560' }) : null;
+    const subs = items.filter(i => i.parent_id === item.id);
+    const hasNotes = item.notes && item.notes.trim();
+    const hasLinks = Array.isArray(item.links) && item.links.filter(l => l.url).length > 0;
+
+    const subCards = subs.length
+      ? `<div style="margin-top:10px;padding-left:14px;border-left:2px solid #e8e4de;display:flex;flex-direction:column;gap:8px;">
+          ${subs.map(s => itemCard(s, true)).join('')}
+        </div>`
+      : '';
+
+    const linksHtml = hasLinks
+      ? item.links.filter(l => l.url).map(l => {
+          const url = /^https?:\/\//i.test(l.url) ? l.url : 'https://' + l.url;
+          return `<a href="${url}" target="_blank" rel="noopener"
+            style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#2667b8;text-decoration:none;background:#eef4ff;border:1px solid #b3cef5;border-radius:20px;padding:2px 10px;">
+            ↗ ${l.label || l.url}
+          </a>`;
+        }).join('')
+      : '';
+
+    return `
+      <div style="background:#fff;border:1px solid #e8e4de;border-radius:12px;padding:14px 16px;${isSubtask ? 'background:#fafaf8;' : ''}">
+        <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:${hasNotes || hasLinks ? '6px' : '0'}">
+              <span style="font-size:${isSubtask ? '14px' : '15px'};font-weight:${isSubtask ? '400' : '600'};color:#1a1714;${item.status === 'packed' ? 'text-decoration:line-through;color:#9e9890;' : ''}">${item.name}</span>
+              ${item.quantity ? `<span style="font-size:12px;color:#9e9890;background:#f5f3ef;border:1px solid #e8e4de;border-radius:20px;padding:1px 9px;">${item.quantity}</span>` : ''}
+            </div>
+            ${hasNotes ? `<div style="font-size:12px;color:#6b6560;margin-bottom:6px;">📝 ${item.notes}</div>` : ''}
+            ${hasLinks ? `<div style="display:flex;flex-wrap:wrap;gap:5px;">${linksHtml}</div>` : ''}
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">
+            <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${sc.bg};color:${sc.text};border:1px solid ${sc.border};">${sl}</span>
+            ${src ? `<span style="font-size:11px;padding:2px 9px;border-radius:20px;background:${src.bg};color:${src.text};border:1px solid ${src.bg};">${item.source}</span>` : ''}
+          </div>
+        </div>
+        ${subCards}
+      </div>`;
+  }
+
+  const packedCount = catItems.filter(i => i.status === 'packed').length;
+  const totalCount  = catItems.length;
+  const pct = totalCount ? Math.round(packedCount / totalCount * 100) : 0;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${cat.icon || ''} ${cat.name} – Shopping List</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: #f5f3ef; color: #1a1714; min-height: 100vh; padding: 24px 16px 48px; }
+    .header { background: #fff; border: 1px solid #e8e4de; border-radius: 16px; padding: 20px 22px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+    .header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .header-emoji { font-size: 30px; }
+    .header-title { font-family: 'DM Serif Display', serif; font-size: 26px; color: #1a1714; }
+    .header-sub { font-size: 12px; color: #9e9890; margin-top: 2px; }
+    .progress-bar { height: 6px; background: #e8e4de; border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
+    .progress-fill { height: 100%; background: #c4870a; border-radius: 3px; transition: width 0.4s; }
+    .progress-text { font-size: 12px; color: #6b6560; }
+    .progress-pct { font-weight: 600; color: #c4870a; }
+    .items-list { display: flex; flex-direction: column; gap: 10px; }
+    .generated { font-size: 11px; color: #9e9890; text-align: center; margin-top: 32px; }
+  </style>
+</head>
+<body>
+  <div style="max-width:600px;margin:0 auto;">
+    <div class="header">
+      <div class="header-top">
+        <span class="header-emoji">${cat.icon || '📦'}</span>
+        <div>
+          <div class="header-title">${cat.name}</div>
+          <div class="header-sub">GLIM 2025 · Batch 1 · Shopping List</div>
+        </div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-text">${packedCount} of ${totalCount} packed &nbsp;<span class="progress-pct">${pct}%</span></div>
+    </div>
+    <div class="items-list">
+      ${catItems.map(item => itemCard(item)).join('\n')}
+    </div>
+    <div class="generated">Generated ${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+  </div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `${cat.name.replace(/[^a-z0-9]/gi, '_')}_shopping_list.html`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast(`Downloaded ${cat.name} list ✓`);
+}
 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 setup();
